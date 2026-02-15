@@ -16,56 +16,113 @@ Industrial IoT environments generate **massive, continuous sensor data streams**
 
 ## Architecture
 
+```mermaid
+flowchart TB
+    subgraph PLANT["Industrial Plant — 3 Production Lines"]
+        direction LR
+        subgraph L1["Line 1"]
+            C1["Compressor-01"]
+            M1["Motor-01"]
+            P1["Pump-01"]
+        end
+        subgraph L2["Line 2"]
+            C2["Compressor-02"]
+            M2["Motor-02"]
+            P2["Pump-02"]
+        end
+        subgraph L3["Line 3"]
+            C3["Compressor-03"]
+            M3["Motor-03"]
+            P3["Pump-03"]
+        end
+    end
+
+    subgraph DATA["Data Pipeline"]
+        CSV["Synthetic Dataset\n155,520 rows\n5 anomaly types"]
+        SIM["MQTT Simulator\nStreams CSV → MQTT"]
+        MQTT["Mosquitto Broker\neclipse-mosquitto:2\nPort 1883"]
+        CSV --> SIM --> MQTT
+    end
+
+    subgraph MCP["AegisFlow MCP Server — Python / FastMCP"]
+        direction TB
+
+        AD["Anomaly Detector\nZ-score · sliding window (60)\nthreshold 3.0"]
+        DB[("SQLite DB\nsensor_readings\nanomalies\nincident_reports")]
+        RAG["RAG Retriever\nall-MiniLM-L6-v2\nequipment manual"]
+
+        subgraph TOOLS["9 MCP Tools"]
+            direction LR
+            subgraph READ["Read Tools (auto-approved)"]
+                T1["get_sensor_stream"]
+                T2["get_device_status"]
+                T3["get_active_anomalies"]
+                T4["get_anomaly_history"]
+                T5["query_device_manual"]
+                T6["get_incident_reports"]
+            end
+            subgraph WRITE["Write Tools (policy-gated)"]
+                T7["execute_device_command"]
+                T8["acknowledge_anomaly"]
+                T9["log_incident_report"]
+            end
+        end
+
+        AD --> DB
+        T5 -.- RAG
+        T4 & T6 -.- DB
+        T7 & T8 --> DB
+    end
+
+    subgraph ARCH["Archestra Platform"]
+        direction TB
+        PROXY["LLM Proxy\nIntercepts & enforces\nsecurity policies"]
+        POLICY["Tool Policies\nBlocks: emergency_shutdown,\nrestart"]
+        AGENT["AI Agent\nClaude · system prompt\noperations engineer"]
+        CHAT["Chat UI\nOperator interface"]
+        OBS["Observability\nTraces · costs · audit trail"]
+
+        CHAT <--> AGENT
+        AGENT <--> PROXY
+        PROXY --> POLICY
+    end
+
+    PLANT -.->|"temp · pressure · vibration\nhumidity · power"| DATA
+    MQTT -->|"aegisflow/sensors/{device_id}"| AD
+    AGENT <-->|"stdio transport"| TOOLS
+    POLICY -.->|"blocked commands\nrejected"| AGENT
+    T7 -.->|"reduce_load · set_parameter\nenable_maintenance_mode"| PLANT
+
+    style PLANT fill:#e8f5e9,stroke:#2e7d32,color:#1b5e20
+    style DATA fill:#e3f2fd,stroke:#1565c0,color:#0d47a1
+    style MCP fill:#fff3e0,stroke:#e65100,color:#bf360c
+    style ARCH fill:#f3e5f5,stroke:#6a1b9a,color:#4a148c
+    style READ fill:#c8e6c9,stroke:#388e3c,color:#1b5e20
+    style WRITE fill:#ffcdd2,stroke:#c62828,color:#b71c1c
+    style POLICY fill:#ffcdd2,stroke:#c62828,color:#b71c1c
+    style AD fill:#fff9c4,stroke:#f57f17,color:#e65100
+    style DB fill:#e0e0e0,stroke:#616161,color:#212121
+    style RAG fill:#e0f7fa,stroke:#00838f,color:#006064
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                    Archestra Platform                            │
-│  ┌──────────┐   ┌──────────────┐   ┌────────────────────────┐  │
-│  │ Chat UI  │──▶│ AegisFlow    │──▶│ MCP Gateway            │  │
-│  │(Operator)│   │ Agent        │   │ (routes tool calls)    │  │
-│  └──────────┘   │ (LLM+prompt) │   └──────────┬─────────────┘  │
-│                 └──────────────┘               │                │
-│  ┌─────────────────┐  ┌─────────────────────┐  │               │
-│  │ Dynamic Tools   │  │ Observability       │  │               │
-│  │ (HITL guardrail │  │ (traces, costs,     │  │               │
-│  │  for critical   │  │  audit trail)       │  │               │
-│  │  commands)   ⚠️ │  │                     │  │               │
-│  └─────────────────┘  └─────────────────────┘  │               │
-└────────────────────────────────────────────────┼───────────────┘
-                                                 │
-                    ┌────────────────────────────┘
-                    ▼
-┌─────────────────────────────────────────────────────────────────┐
-│              AegisFlow MCP Server (Python / FastMCP)            │
-│                                                                 │
-│  READ TOOLS (auto-approved):                                    │
-│  ├── get_sensor_stream        latest readings from all devices  │
-│  ├── get_device_status        per-device status + active alert  │
-│  ├── get_active_anomalies     all unresolved alerts             │
-│  ├── get_anomaly_history      historical anomaly records        │
-│  ├── query_device_manual      RAG over equipment SOPs           │
-│  └── get_incident_reports     agent long-term memory           │
-│                                                                 │
-│  WRITE TOOLS (HITL gated ⚠️):                                   │
-│  ├── execute_device_command   controls physical equipment       │
-│  ├── acknowledge_anomaly      clears alert without action       │
-│  └── log_incident_report      writes to agent memory           │
-│                                                                 │
-│  INTERNAL SERVICES:                                             │
-│  ├── MQTT Simulator     streams CSV data as live MQTT messages  │
-│  ├── Anomaly Detector   Z-score + sliding window (60 readings)  │
-│  ├── SQLite DB          sensor history, anomalies, incidents    │
-│  └── RAG Retriever      sentence-transformers over manual       │
-│                                                                 │
-│  DATA:                                                          │
-│  └── 155,520-row synthetic dataset, 5 injected anomaly types   │
-└─────────────────────────────────────────────────────────────────┘
-          ▲
-          │ MQTT publish (aegisflow/sensors/{device_id})
-          │
-┌─────────────────────┐
-│  Mosquitto Broker   │
-│  (eclipse-mosquitto) │
-└─────────────────────┘
+
+### Data Flow
+
+```
+Sensor CSV ──► MQTT Simulator ──► Mosquitto Broker ──► Anomaly Detector
+                                                              │
+                                              Z-score breach? │
+                                                    ┌─────────┘
+                                                    ▼
+                  Archestra Chat UI ◄──► AI Agent ──► MCP Tools
+                       │                    │            │
+                       │              LLM Proxy     ┌────┴────┐
+                       │              (security)    │ SQLite  │
+                       │                   │        │ RAG     │
+                       │            Tool Policies   └─────────┘
+                       │            (blocks unsafe
+                       ▼             commands)
+                   Operator
+                   Approval
 ```
 
 ---
