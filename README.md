@@ -18,6 +18,8 @@ Industrial IoT environments generate **massive, continuous sensor data streams**
 
 ![aegisflow](https://github.com/user-attachments/assets/d24a5bac-7efe-49b3-bc74-85df6b347f3c)
 
+AegisFlow streams live sensor data from 9 industrial devices across 3 production lines through MQTT into our anomaly detector, which uses Z-score analysis on a sliding window to flag deviations in real time. When anomalies are detected, the AI agent — powered by Claude through Archestra — diagnoses the root cause using 9 MCP tools including RAG-based manual lookups and historical incident reports. Critically, Archestra's LLM Proxy and Tool Policies act as safety guardrails, blocking dangerous commands like emergency shutdowns so the agent can only issue safer actions like load reduction — keeping a human operator in the loop for high-risk decisions.
+
 
 ### Data Flow
 
