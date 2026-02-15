@@ -76,7 +76,6 @@ class MQTTSimulator:
                         "vibration":         float(row["vibration"]),
                         "humidity":          float(row["humidity"]),
                         "power_consumption": float(row["power_consumption"]),
-                        # NOTE: is_anomaly / anomaly_type deliberately excluded
                     })
 
                     self.client.publish(topic, payload, qos=0)

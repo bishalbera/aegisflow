@@ -1,0 +1,4 @@
+data/sensor_data.csv
+*.db
+__pycache__/
+*.pyc

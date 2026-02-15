@@ -30,7 +30,7 @@ anomaly_queue: list[dict] = []
 
 def on_anomaly(info: dict):
     anomaly_queue.append(info)
-    print(f"🚨 ANOMALY DETECTED: {info['device_id']} — {info['severity'].upper()}")
+    print(f"ANOMALY DETECTED: {info['device_id']} — {info['severity'].upper()}")
 
 
 detector.on_anomaly_detected = on_anomaly
@@ -188,13 +188,6 @@ def execute_device_command(
         justification: Detailed explanation of WHY this action is necessary.
                        This text is shown to the human operator for approval.
                        Include: anomaly readings, SOP reference, and expected outcome.
-
-    WARNING: This controls physical equipment. Incorrect commands can cause equipment
-    damage, production downtime, or safety incidents. Before calling this tool:
-    1. Confirm anomaly readings via get_sensor_stream / get_device_status
-    2. Look up the correct procedure via query_device_manual
-    3. Check for similar past incidents via get_incident_reports
-    4. Provide a complete, specific justification
     """
     valid_commands = [
         "emergency_shutdown", "reduce_load", "restart",
